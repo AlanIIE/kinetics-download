@@ -69,11 +69,16 @@ def download_clip(row, label_to_dir, trim, count, flist, proxy, NV):
         cap = cv2.VideoCapture(output_filename)
         ret,frame = cap.read()
         cap.release()
+    else:
+        ret = False
     if not ret or not os.path.exists(os.path.join(output_path, filename + VIDEO_EXTENSION)):
+        # print('Start downloading: ', filename)
         try:
             commond = 'youtube-dl --no-continue ' + URL_BASE + filename + \
             ' -f "best[height<=480]" -o ' + os.path.join(output_path, filename + VIDEO_EXTENSION) \
             + ' --proxy ' + proxy
+            # print(commond)
+            # import pdb;pdb.set_trace()
             subprocess.check_output(commond, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError:
             with open(flist, 'a') as f:
@@ -88,6 +93,7 @@ def download_clip(row, label_to_dir, trim, count, flist, proxy, NV):
         input_filename = os.path.join(output_path, filename + VIDEO_EXTENSION)
 
 
+        # print('Start trimming: ', filename)
         # Construct command to trim the videos (ffmpeg required).
         if NV:
             command_GPU = 'ffmpeg -hwaccel cuvid -y -i "{input_filename}" ' \
@@ -128,6 +134,7 @@ def download_clip(row, label_to_dir, trim, count, flist, proxy, NV):
                     f.write(URL_BASE + filename+'\n')
                 print('Error while trimming: ', filename)
                 return False
+        # print('Finish trimming: ', filename)
 
     
 
@@ -138,6 +145,7 @@ def main(input_csv, output_dir, trim, num_jobs, flist, proxy, NV):
 
     assert input_csv[-4:] == '.csv', 'Provided input is not a .csv file'
     links_df = pd.read_csv(input_csv)
+# links_df = shuffle(links_df) ######shuffle
     assert all(elem in REQUIRED_COLUMNS for elem in links_df.columns.values),\
         'Input csv doesn\'t contain required columns.'
 
@@ -181,3 +189,4 @@ if __name__ == '__main__':
                         'For example socks5://127.0.0.1:1080/. \n'
                         'Pass in an empty string (--proxy "") for direct connection.')
     main(**vars(p.parse_args()))
+# python download.py failure_list.txt xaa.csv videos --trim --num-jobs 10 --proxy
