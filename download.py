@@ -1,7 +1,6 @@
 import pandas as pd
 import argparse
 import os
-import glob
 import shutil
 import subprocess
 from joblib import delayed
@@ -56,6 +55,7 @@ def download_clip(row, label_to_dir, trim, count, flist, proxy, NV):
     output_filename = os.path.join(label_to_dir[label],
                                filename + '_{}_{}'.format(start, end) + VIDEO_EXTENSION)
 
+    # don't download if already exists
     if os.path.exists(output_filename):
         cap = cv2.VideoCapture(output_filename)
         ret,frame = cap.read()
@@ -64,21 +64,17 @@ def download_clip(row, label_to_dir, trim, count, flist, proxy, NV):
             return 
         cap.release()
 
-    # don't download if already exists
     if os.path.exists(os.path.join(output_path, filename + VIDEO_EXTENSION)):
-        cap = cv2.VideoCapture(output_filename)
+        cap = cv2.VideoCapture(os.path.join(output_path, filename + VIDEO_EXTENSION))
         ret,frame = cap.read()
         cap.release()
     else:
         ret = False
-    if not ret or not os.path.exists(os.path.join(output_path, filename + VIDEO_EXTENSION)):
-        # print('Start downloading: ', filename)
+    if not ret:
         try:
             commond = 'youtube-dl --no-continue ' + URL_BASE + filename + \
             ' -f "best[height<=480]" -o ' + os.path.join(output_path, filename + VIDEO_EXTENSION) \
             + ' --proxy ' + proxy
-            # print(commond)
-            # import pdb;pdb.set_trace()
             subprocess.check_output(commond, shell=True, stderr=subprocess.STDOUT)
         except subprocess.CalledProcessError:
             with open(flist, 'a') as f:
@@ -92,8 +88,6 @@ def download_clip(row, label_to_dir, trim, count, flist, proxy, NV):
         # better write full path to video
         input_filename = os.path.join(output_path, filename + VIDEO_EXTENSION)
 
-
-        # print('Start trimming: ', filename)
         # Construct command to trim the videos (ffmpeg required).
         if NV:
             command_GPU = 'ffmpeg -hwaccel cuvid -y -i "{input_filename}" ' \
@@ -134,18 +128,16 @@ def download_clip(row, label_to_dir, trim, count, flist, proxy, NV):
                     f.write(URL_BASE + filename+'\n')
                 print('Error while trimming: ', filename)
                 return False
-        # print('Finish trimming: ', filename)
 
     
 
 
-def main(input_csv, output_dir, trim, num_jobs, flist, proxy, NV):
+def main(input_csv, output_dir, trim, num_jobs, flist, proxy, NV, start, stop):
 
     global TOTAL_VIDEOS
 
     assert input_csv[-4:] == '.csv', 'Provided input is not a .csv file'
     links_df = pd.read_csv(input_csv)
-# links_df = shuffle(links_df) ######shuffle
     assert all(elem in REQUIRED_COLUMNS for elem in links_df.columns.values),\
         'Input csv doesn\'t contain required columns.'
 
@@ -157,10 +149,11 @@ def main(input_csv, output_dir, trim, num_jobs, flist, proxy, NV):
     with open(flist, 'w') as f:
         f.write('')
 
-    TOTAL_VIDEOS = links_df.shape[0]
+    videos_to_download = links_df[start:stop]
+    TOTAL_VIDEOS = videos_to_download.shape[0]
     # Download files by links from dataframe
     Parallel(n_jobs=num_jobs)(delayed(download_clip)(
-            row, label_to_dir, trim, count, flist, proxy, NV) for count, row in links_df.iterrows())
+            row, label_to_dir, trim, count, flist, proxy, NV) for count, row in videos_to_download.iterrows())
 
 
 if __name__ == '__main__':
@@ -181,6 +174,10 @@ if __name__ == '__main__':
                         'Requires "ffmpeg" installed and added to environment PATH')
     p.add_argument('--NV', action='store_true', dest='NV', default=False,
                    help='True: Use ffmpeg nvenc')
+    p.add_argument('--start', type=int, default=0,
+                   help='Start download from middle of the index in csv.')
+    p.add_argument('--stop', type=int, default=None,
+                   help='Stop index.')
     p.add_argument('--num-jobs', type=int, default=1,
                    help='Number of parallel processes for downloading and trimming.')
     p.add_argument('--proxy', type=str, default="socks5://127.0.0.1:10808",
@@ -189,4 +186,3 @@ if __name__ == '__main__':
                         'For example socks5://127.0.0.1:1080/. \n'
                         'Pass in an empty string (--proxy "") for direct connection.')
     main(**vars(p.parse_args()))
-# python download.py failure_list.txt xaa.csv videos --trim --num-jobs 10 --proxy
