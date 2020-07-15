@@ -9,7 +9,7 @@ Install requirements first
 ```
 pip install -r requirements.txt
 ```
-Install [youtube-dl](https://youtube-dl.org/) and [ffmpeg](https://github.com/FFmpeg/FFmpeg) according to your system.
+Install [youtube-dl](https://youtube-dl.org/) and [ffmpeg](https://github.com/FFmpeg/FFmpeg) according to your system and added them to environment variable PATH.
 
 You should download and unzip csv files with links to videos. You can download such files [here](https://deepmind.com/research/open-source/open-source-datasets/kinetics/).
 For example here is link to [kinetics-600 training.zip](https://deepmind.com/documents/193/kinetics_600_train%20(1).zip)
